@@ -12,6 +12,11 @@ import { hashPassword } from './utils';
 
 function App() {
    // --- State ---
+   // API Base URL
+   const API_BASE = 'http://localhost:3001/api';
+
+   // --- State ---
+   const [isLoading, setIsLoading] = useState(true);
    const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
    const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
    const [assets, setAssets] = useState<Asset[]>([]); // New Asset State
@@ -33,6 +38,14 @@ function App() {
    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
    const [settingsTab, setSettingsTab] = useState<'appearance' | 'wallpaper' | 'users' | 'data' | 'assets'>('appearance');
    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+   // Password Change State
+   const [showPasswordModal, setShowPasswordModal] = useState(false);
+   const [oldPassword, setOldPassword] = useState('');
+   const [newPassword, setNewPassword] = useState('');
+   const [confirmPassword, setConfirmPassword] = useState('');
+   const [passwordError, setPasswordError] = useState('');
+   const [passwordSuccess, setPasswordSuccess] = useState('');
 
    // Service Form State
    const [iconPreview, setIconPreview] = useState<string>('');
@@ -58,78 +71,88 @@ function App() {
    const [failedWallpaperUrl, setFailedWallpaperUrl] = useState<string>(''); // 记住失败的URL
 
    // --- Initialization ---
+   // --- Initialization ---
    useEffect(() => {
-      const storedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
-      const storedServices = localStorage.getItem(STORAGE_KEYS.SERVICES);
-      const storedAssets = localStorage.getItem(STORAGE_KEYS.ASSETS); // Load assets
-      const storedNetworkMode = localStorage.getItem(STORAGE_KEYS.NETWORK_MODE);
-      const authDataStr = localStorage.getItem(STORAGE_KEYS.AUTH_DATA);
-
-      let currentConfig = DEFAULT_CONFIG;
-
-      if (storedConfig) {
-         let parsedConfig: AppConfig = JSON.parse(storedConfig);
-         // Migration: Single user to Multiple users
-         if (!parsedConfig.users && parsedConfig.userName) {
-            parsedConfig = {
-               ...parsedConfig,
-               users: [{
-                  username: parsedConfig.userName,
-                  passwordHash: parsedConfig.authHash || null
-               }]
-            };
-            delete parsedConfig.userName;
-            delete parsedConfig.authHash;
-         }
-         // Migration: Split Header Colors
-         if (parsedConfig.headerColor) {
-            if (!parsedConfig.headerTitleColor) parsedConfig.headerTitleColor = parsedConfig.headerColor;
-            if (!parsedConfig.headerGreetingColor) parsedConfig.headerGreetingColor = parsedConfig.headerColor;
-            delete parsedConfig.headerColor;
-         }
-
-         localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsedConfig));
-         currentConfig = { ...DEFAULT_CONFIG, ...parsedConfig };
-         setConfig(currentConfig);
-      }
-
-      if (storedServices) { setServices(JSON.parse(storedServices)); }
-
-      // Load assets from server instead of localStorage
-      loadAssetsFromServer();
-      if (storedNetworkMode) setNetworkMode(storedNetworkMode as NetworkMode);
-
-      // Check Auth Expiration or Guest Access
-      if (authDataStr) {
+      const initData = async () => {
          try {
-            const authData = JSON.parse(authDataStr);
-            const now = Date.now();
-            const daysPassed = (now - authData.timestamp) / (1000 * 60 * 60 * 24);
+            // 1. Fetch Config & Services
+            const dataRes = await fetch(`${API_BASE}/data`);
+            let currentConfig = DEFAULT_CONFIG;
 
-            if (daysPassed < AUTH_EXPIRATION_DAYS) {
-               if (currentConfig.users && currentConfig.users.length > 0) {
-                  setIsAuthenticated(true);
-                  setCurrentUser(authData.username);
-                  setIsGuest(false);
-               } else {
+            if (dataRes.ok) {
+               const serverData = await dataRes.json();
+               if (serverData.config) {
+                  currentConfig = { ...DEFAULT_CONFIG, ...serverData.config };
+                  setConfig(currentConfig);
+               }
+               if (serverData.services) {
+                  setServices(serverData.services);
+               }
+            }
+
+            // 2. Fetch Assets
+            const assetsRes = await fetch(`${API_BASE}/assets`);
+            if (assetsRes.ok) {
+               const serverAssets = await assetsRes.json();
+               const formattedAssets = serverAssets.map((asset: any) => ({
+                  id: asset.id,
+                  type: asset.type,
+                  data: asset.url,
+                  createdAt: asset.createdAt
+               }));
+               setAssets(formattedAssets);
+            }
+
+            // 3. Local Settings (Network Mode)
+            const storedNetworkMode = localStorage.getItem(STORAGE_KEYS.NETWORK_MODE);
+            if (storedNetworkMode) {
+               setNetworkMode(storedNetworkMode as NetworkMode);
+            } else {
+               // 默认使用外网模式
+               setNetworkMode(NetworkMode.EXTERNAL);
+            }
+
+            // 4. Auth Check
+            const authDataStr = localStorage.getItem(STORAGE_KEYS.AUTH_DATA);
+            if (authDataStr) {
+               try {
+                  const authData = JSON.parse(authDataStr);
+                  const now = Date.now();
+                  const daysPassed = (now - authData.timestamp) / (1000 * 60 * 60 * 24);
+
+                  if (daysPassed < AUTH_EXPIRATION_DAYS) {
+                     // Check if user exists in the FETCHED config
+                     if (currentConfig.users && currentConfig.users.some(u => u.username === authData.username)) {
+                        setIsAuthenticated(true);
+                        setCurrentUser(authData.username);
+                        setIsGuest(false);
+                     } else {
+                        localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
+                     }
+                  } else {
+                     localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
+                  }
+               } catch (e) {
                   localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
                }
             } else {
-               localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
+               // Guest Access Check
+               if (currentConfig.enableGuestAccess && currentConfig.users.length > 0) {
+                  setIsAuthenticated(true);
+                  setIsGuest(true);
+                  setCurrentUser('访客');
+               }
             }
-         } catch (e) {
-            localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
-         }
-      } else {
-         // No Auth Data - Check Guest Access
-         if (currentConfig.enableGuestAccess && currentConfig.users.length > 0) {
-            setIsAuthenticated(true);
-            setIsGuest(true);
-            setCurrentUser('访客');
-         }
-      }
 
-      setAuthInitialized(true);
+            setAuthInitialized(true);
+         } catch (error) {
+            console.error("Initialization error:", error);
+         } finally {
+            setIsLoading(false);
+         }
+      };
+
+      initData();
 
       // Clock Timer
       const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -180,18 +203,31 @@ function App() {
    };
 
    // --- Persistence ---
-   const saveConfig = (newConfig: AppConfig) => {
+   const saveConfig = async (newConfig: AppConfig) => {
       setConfig(newConfig);
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(newConfig));
+      try {
+         await fetch(`${API_BASE}/data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ config: newConfig })
+         });
+      } catch (e) {
+         console.error("Failed to save config", e);
+      }
    };
 
-   const saveServices = (newServices: ServiceItem[]) => {
+   const saveServices = async (newServices: ServiceItem[]) => {
       setServices(newServices);
-      localStorage.setItem(STORAGE_KEYS.SERVICES, JSON.stringify(newServices));
+      try {
+         await fetch(`${API_BASE}/data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ services: newServices })
+         });
+      } catch (e) {
+         console.error("Failed to save services", e);
+      }
    };
-
-   // API 基础 URL
-   const API_BASE = 'http://localhost:3001/api';
 
    // 从服务器加载素材
    const loadAssetsFromServer = async () => {
@@ -412,6 +448,55 @@ function App() {
       }
    };
 
+   // --- Password Change Handler ---
+   const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setPasswordError('');
+      setPasswordSuccess('');
+
+      // Validate inputs
+      if (newPassword !== confirmPassword) {
+         setPasswordError('两次输入的新密码不一致');
+         return;
+      }
+      if (newPassword.length < 4) {
+         setPasswordError('新密码至少需要 4 位');
+         return;
+      }
+
+      // Find current user
+      const user = config.users?.find((u: User) => u.username === currentUser);
+      if (!user) {
+         setPasswordError('未找到当前用户');
+         return;
+      }
+
+      // Verify old password
+      const hashedOldPassword = await hashPassword(oldPassword);
+      if (user.passwordHash && user.passwordHash !== hashedOldPassword) {
+         setPasswordError('旧密码错误');
+         return;
+      }
+
+      // Update password
+      const hashedNewPassword = await hashPassword(newPassword);
+      const updatedUsers = config.users.map((u: User) =>
+         u.username === currentUser ? { ...u, passwordHash: hashedNewPassword } : u
+      );
+      saveConfig({ ...config, users: updatedUsers });
+
+      setPasswordSuccess('密码修改成功！');
+      // Clear form after 2 seconds
+      setTimeout(() => {
+         setOldPassword('');
+         setNewPassword('');
+         setConfirmPassword('');
+         setPasswordError('');
+         setPasswordSuccess('');
+         setShowPasswordModal(false);
+      }, 2000);
+   };
+
    // --- Image Upload & Asset Saving ---
    const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -419,8 +504,14 @@ function App() {
          const reader = new FileReader();
          reader.onloadend = async () => {
             const result = reader.result as string;
+            // 先显示预览（使用base64）
             setIconPreview(result);
-            await addAsset(result, 'icon'); // Auto save to library
+            // 上传到服务器并获取URL
+            const serverUrl = await addAsset(result, 'icon');
+            // 如果上传成功，使用服务器URL替换base64
+            if (serverUrl) {
+               setIconPreview(serverUrl);
+            }
          };
          reader.readAsDataURL(file);
       }
@@ -474,8 +565,14 @@ function App() {
       if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'http://' + targetUrl;
       const iconsFound = new Set<string>();
       try {
-         const domain = new URL(targetUrl).hostname;
+         const urlObj = new URL(targetUrl);
+         const domain = urlObj.hostname; // 只获取域名，不包含端口号
+         // Google Favicon API - 只需要域名
          iconsFound.add(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+
+         // 尝试获取根URL+端口的favicon.ico
+         const baseUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? ':' + urlObj.port : ''}`;
+         iconsFound.add(`${baseUrl}/favicon.ico`);
       } catch (e) { }
       try {
          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
@@ -636,7 +733,13 @@ function App() {
       return userWallpaper;
    }, [config.backgroundImageUrl, failedWallpaperUrl]);
 
-   if (!authInitialized) return null;
+   if (isLoading || !authInitialized) {
+      return (
+         <div className="flex h-screen w-full items-center justify-center bg-gray-900">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+         </div>
+      );
+   }
 
    return (
       <div className="relative h-screen w-full overflow-hidden font-sans text-[#1d1d1f] selection:bg-blue-500/30">
@@ -797,11 +900,11 @@ function App() {
                         <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-wider mb-4">链接配置</h3>
                         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4 mb-3">
                            <label className="text-left md:text-right text-[13px] font-medium text-gray-500">内网地址</label>
-                           <div className="md:col-span-3"><input name="urlInternal" defaultValue={editingService?.urlInternal} required placeholder="http://192.168.x.x" className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono" /></div>
+                           <div className="md:col-span-3"><input name="urlInternal" defaultValue={editingService?.urlInternal} placeholder="http://192.168.x.x（可选）" className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono" /></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-2 md:gap-4">
                            <label className="text-left md:text-right text-[13px] font-medium text-gray-500">外网地址</label>
-                           <div className="md:col-span-3"><input name="urlExternal" defaultValue={editingService?.urlExternal} placeholder="https://example.com" className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono" /></div>
+                           <div className="md:col-span-3"><input name="urlExternal" defaultValue={editingService?.urlExternal} required placeholder="https://example.com（必填）" className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono" /></div>
                         </div>
                      </div>
                      <div className="border-t border-gray-100 pt-4">
@@ -882,6 +985,94 @@ function App() {
                         </button>
                      </div>
                   </div>
+               </Modal>
+
+               {/* Password Change Modal */}
+               <Modal
+                  isOpen={showPasswordModal}
+                  onClose={() => {
+                     setShowPasswordModal(false);
+                     setOldPassword('');
+                     setNewPassword('');
+                     setConfirmPassword('');
+                     setPasswordError('');
+                     setPasswordSuccess('');
+                  }}
+                  title="修改密码"
+                  maxWidth="max-w-[450px]"
+                  zIndex={200}
+               >
+                  <form onSubmit={handleChangePassword} className="space-y-4">
+                     <div>
+                        <label className="block text-[13px] font-medium text-gray-700 mb-2">旧密码</label>
+                        <input
+                           type="password"
+                           value={oldPassword}
+                           onChange={(e) => setOldPassword(e.target.value)}
+                           className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                           placeholder="请输入旧密码"
+                           required
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[13px] font-medium text-gray-700 mb-2">新密码</label>
+                        <input
+                           type="password"
+                           value={newPassword}
+                           onChange={(e) => setNewPassword(e.target.value)}
+                           className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                           placeholder="请输入新密码（至少4位）"
+                           required
+                        />
+                     </div>
+                     <div>
+                        <label className="block text-[13px] font-medium text-gray-700 mb-2">确认新密码</label>
+                        <input
+                           type="password"
+                           value={confirmPassword}
+                           onChange={(e) => setConfirmPassword(e.target.value)}
+                           className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                           placeholder="再次输入新密码"
+                           required
+                        />
+                     </div>
+
+                     {passwordError && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[8px] text-[13px]">
+                           {passwordError}
+                        </div>
+                     )}
+
+                     {passwordSuccess && (
+                        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-[8px] text-[13px] flex items-center gap-2">
+                           <Check size={16} />
+                           {passwordSuccess}
+                        </div>
+                     )}
+
+                     <div className="flex justify-end gap-3 pt-2">
+                        <button
+                           type="button"
+                           onClick={() => {
+                              setShowPasswordModal(false);
+                              setOldPassword('');
+                              setNewPassword('');
+                              setConfirmPassword('');
+                              setPasswordError('');
+                              setPasswordSuccess('');
+                           }}
+                           className="px-4 py-2 text-[14px] font-medium text-gray-600 hover:bg-gray-100 rounded-[8px] transition-colors"
+                        >
+                           取消
+                        </button>
+                        <button
+                           type="submit"
+                           className="px-6 py-2 text-[14px] font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-[8px] shadow-sm transition-colors"
+                        >
+                           确认修改
+                        </button>
+                     </div>
+                  </form>
                </Modal>
 
                {/* --- SPLIT-VIEW SETTINGS MODAL --- */}
@@ -1096,6 +1287,23 @@ function App() {
                            <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300 h-full flex flex-col">
                               <div className="flex justify-between items-center mb-4">
                                  <h3 className="text-[16px] font-bold text-gray-900">用户管理</h3>
+                              </div>
+
+                              {/* Password Change Section */}
+                              <div className="mb-4 bg-blue-50 p-4 rounded-[12px] border border-blue-200">
+                                 <div className="flex items-center justify-between">
+                                    <div>
+                                       <h4 className="text-[13px] font-semibold text-blue-900">账户安全</h4>
+                                       <p className="text-[11px] text-blue-700">修改当前账户的登录密码</p>
+                                    </div>
+                                    <button
+                                       onClick={() => setShowPasswordModal(true)}
+                                       className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-[8px] text-[12px] font-medium transition-colors shadow-sm flex items-center gap-2"
+                                    >
+                                       <Shield size={14} />
+                                       修改密码
+                                    </button>
+                                 </div>
                               </div>
 
                               <div className="mb-4 bg-gray-50 p-4 rounded-[12px] border border-gray-200 flex items-center justify-between">
