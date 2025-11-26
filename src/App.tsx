@@ -851,8 +851,8 @@ function App() {
                         <img src="/logo.png" alt="NexusHub" className="w-5 h-5" />
                      </div>
                      <div className="flex flex-col">
-                        <span className="text-[15px] font-bold leading-none tracking-tight" style={{ color: config.headerTitleColor || '#1f2937' }}>NexusHub</span>
-                        <span className="text-[11px] leading-none mt-1 opacity-80" style={{ color: config.headerGreetingColor || '#1f2937' }}>
+                        <span className="text-[15px] font-bold leading-none tracking-tight" style={{ color: config.headerTitleColor || '#ffffff' }}>NexusHub</span>
+                        <span className="text-[11px] leading-none mt-1 opacity-80" style={{ color: config.headerGreetingColor || '#ffffff' }}>
                            {isGuest ? '访客模式' : `${getGreeting()}`}
                         </span>
                      </div>
@@ -1270,10 +1270,10 @@ function App() {
                                  <div className="grid grid-cols-2 gap-4 pt-2">
                                     <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">分类颜色</label><div className="flex items-center gap-2"><input type="color" value={config.categoryColor} onChange={(e) => saveConfig({ ...config, categoryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
                                     <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">卡片标题颜色</label><div className="flex items-center gap-2"><input type="color" value={config.cardTitleColor} onChange={(e) => saveConfig({ ...config, cardTitleColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
-                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">卡片描述颜色</label><div className="flex items-center gap-2"><input type="color" value={config.cardDescColor || '#4b5563'} onChange={(e) => saveConfig({ ...config, cardDescColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
+                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">卡片描述颜色</label><div className="flex items-center gap-2"><input type="color" value={config.cardDescColor || '#ffffff'} onChange={(e) => saveConfig({ ...config, cardDescColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
                                     <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">时钟颜色</label><div className="flex items-center gap-2"><input type="color" value={config.clockColor || '#ffffff'} onChange={(e) => saveConfig({ ...config, clockColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
-                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">标题颜色 (NexusHub)</label><div className="flex items-center gap-2"><input type="color" value={config.headerTitleColor || '#1f2937'} onChange={(e) => saveConfig({ ...config, headerTitleColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
-                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">问候语颜色</label><div className="flex items-center gap-2"><input type="color" value={config.headerGreetingColor || '#1f2937'} onChange={(e) => saveConfig({ ...config, headerGreetingColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
+                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">标题颜色 (NexusHub)</label><div className="flex items-center gap-2"><input type="color" value={config.headerTitleColor || '#ffffff'} onChange={(e) => saveConfig({ ...config, headerTitleColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
+                                    <div><label className="text-[12px] font-medium text-gray-500 mb-1.5 block">问候语颜色</label><div className="flex items-center gap-2"><input type="color" value={config.headerGreetingColor || '#e6e6e6'} onChange={(e) => saveConfig({ ...config, headerGreetingColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0" /></div></div>
                                  </div>
                               </div>
                            </div>

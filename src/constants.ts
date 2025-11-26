@@ -16,11 +16,11 @@ export const DEFAULT_CONFIG: AppConfig = {
 
   // Colors
   categoryColor: '#ffffff',
-  cardTitleColor: '#1d1d1f',
-  cardDescColor: '#4b5563',
+  cardTitleColor: '#ffffff',
+  cardDescColor: '#ffffff',
   clockColor: '#ffffff',
-  headerTitleColor: '#1f2937', // dark gray
-  headerGreetingColor: '#1f2937', // dark gray
+  headerTitleColor: '#ffffff', // dark gray
+  headerGreetingColor: '#e6e6e6', // dark gray
 };
 
 export const DEFAULT_SERVICES: ServiceItem[] = [];
