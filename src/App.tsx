@@ -8,7 +8,7 @@ import { Modal } from './components/Modal';
 import { AuthOverlay } from './components/AuthOverlay';
 import { ServiceItem, AppConfig, NetworkMode, User, Asset } from './types';
 import { DEFAULT_SERVICES, DEFAULT_CONFIG, STORAGE_KEYS, AUTH_EXPIRATION_DAYS } from './constants';
-import { hashPassword } from './utils';
+import { hashPassword, verifyPassword } from './utils';
 
 function App() {
    // --- State ---
@@ -423,9 +423,11 @@ function App() {
    };
 
    const handleAuthenticate = async (password: string, inputUsername: string) => {
-      // 0. First Run / Registration
+      // 0. 首次运行 / 注册
       if (config.users.length === 0) {
-         if (password.length < 4) return { success: false, isNewUser: false, needsPasswordSetup: true };
+         if (password.length < 4) {
+            return { success: false, isNewUser: false, needsPasswordSetup: true };
+         }
          const hashedPassword = await hashPassword(password);
          const newUser = { username: inputUsername, passwordHash: hashedPassword };
          const newConfig = { ...config, users: [newUser] };
@@ -436,19 +438,17 @@ function App() {
 
       const userIndex = config.users.findIndex(u => u.username === inputUsername);
 
-      // 1. User not found
+      // 1. 用户不存在
       if (userIndex === -1) {
          return { success: false, isNewUser: true, needsPasswordSetup: false };
       }
 
       const user = config.users[userIndex];
 
-      // HASH PASSWORD
-      const hashedPassword = await hashPassword(password);
-
-      // 2. Setup Password (if null)
+      // 2. 设置密码（如果为 null）
       if (user.passwordHash === null) {
          if (password.length >= 4) {
+            const hashedPassword = await hashPassword(password);
             const updatedUsers = [...config.users];
             updatedUsers[userIndex] = { ...user, passwordHash: hashedPassword };
             saveConfig({ ...config, users: updatedUsers });
@@ -459,12 +459,16 @@ function App() {
          }
       }
 
-      // 3. Validate Password
-      if (user.passwordHash === hashedPassword) {
+      // 3. 验证密码 - 使用新的 verifyPassword 函数（兼容双哈希）
+      const isPasswordValid = await verifyPassword(password, user.passwordHash);
+
+      if (isPasswordValid) {
+         // 登录成功
          loginSuccess(inputUsername);
          return { success: true, isNewUser: false, needsPasswordSetup: false };
       }
 
+      // 密码错误
       return { success: false, isNewUser: false, needsPasswordSetup: false };
    };
 

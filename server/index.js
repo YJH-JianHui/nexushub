@@ -353,11 +353,11 @@ const DEFAULT_DATA = {
         backgroundBlur: 16,
         cardMinWidth: 180,
         categoryColor: '#ffffff',
-        cardTitleColor: '#1d1d1f',
-        cardDescColor: '#4b5563',
+        cardTitleColor: '#ffffff',
+        cardDescColor: '#ffffff',
         clockColor: '#ffffff',
-        headerTitleColor: '#1f2937',
-        headerGreetingColor: '#1f2937',
+        headerTitleColor: '#ffffff',
+        headerGreetingColor: '#e6e6e6',
     },
     services: []
 };
