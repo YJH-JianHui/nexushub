@@ -17,6 +17,9 @@ RUN npm ci --only=production && npm cache clean --force
 # 创建必要的目录
 RUN mkdir -p /app/data /app/public/uploads
 
+# 设置环境变量
+ENV NODE_ENV=production
+
 # 暴露端口(只需要一个端口,服务器同时提供前端和API)
 EXPOSE 3001
 

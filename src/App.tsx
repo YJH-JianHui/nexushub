@@ -12,8 +12,10 @@ import { hashPassword } from './utils';
 
 function App() {
    // --- State ---
-   // API Base URL
-   const API_BASE = 'http://localhost:3001/api';
+   // API Base URL - 使用当前域名,兼容开发和生产环境
+   const API_BASE = import.meta.env.DEV
+      ? 'http://localhost:3001/api'  // 开发环境
+      : `${window.location.origin}/api`;  // 生产环境
 
    // --- State ---
    const [isLoading, setIsLoading] = useState(true);

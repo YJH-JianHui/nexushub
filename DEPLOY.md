@@ -54,8 +54,15 @@ Compress-Archive -Path dist,server,public,package.json,package-lock.json,Dockerf
 
 ```bash
 cd /path/to/nexushub
+
+# 方法1: 使用 docker-compose (推荐)
 docker-compose build
+
+# 方法2: 使用 Dockerfile
+docker build -t nexushub .
 ```
+
+> **注意**: `NODE_ENV=production` 已经在 Dockerfile 中设置,无需手动指定。
 
 ### 4. 启动服务
 

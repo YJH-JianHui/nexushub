@@ -15,12 +15,15 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
-// 在生产环境下,提供静态文件服务
+// 提供静态文件服务
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+app.use('/vendor', express.static(path.join(__dirname, '../public/vendor')));
+app.use(express.static(path.join(__dirname, '../public')));
+
+// 在生产环境下,提供构建后的前端文件
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, '../dist')));
 }
-
-app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // 确保 uploads 目录存在
 const uploadsDir = path.join(__dirname, '../public/uploads');
@@ -405,6 +408,22 @@ app.post('/api/data', (req, res) => {
         res.status(500).json({ error: 'Update failed' });
     }
 });
+
+// SPA Fallback - 所有非API请求都返回index.html(用于生产环境)
+// 使用中间件而不是通配符路由,避免 path-to-regexp 错误
+if (process.env.NODE_ENV === 'production') {
+    app.use((req, res, next) => {
+        // 如果是 API 或静态资源请求,跳过
+        if (req.path.startsWith('/api') ||
+            req.path.startsWith('/uploads') ||
+            req.path.startsWith('/vendor') ||
+            req.path.includes('.')) {
+            return next();
+        }
+        // 其他所有请求返回 index.html
+        res.sendFile(path.join(__dirname, '../dist/index.html'));
+    });
+}
 
 // 启动服务器
 app.listen(PORT, () => {

@@ -110,7 +110,6 @@ docker run -d \
   -p 3001:3001 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/public/uploads:/app/public/uploads \
-  -e NODE_ENV=production \
   --name nexushub \
   nexushub
 ```
