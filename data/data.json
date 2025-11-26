@@ -4,6 +4,7 @@
     "backgroundImageUrl": "/default-wallpaper.jpg",
     "backgroundBlur": 16,
     "cardMinWidth": 180,
+    "categoryOrder": [],
     "categoryColor": "#ffffff",
     "cardTitleColor": "#1d1d1f",
     "cardDescColor": "#4b5563",

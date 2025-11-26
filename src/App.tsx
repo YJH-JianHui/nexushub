@@ -349,13 +349,13 @@ function App() {
    };
 
    // Validate image can load before adding as asset
-   const validateAndAddAsset = (url: string, type: 'icon' | 'wallpaper'): Promise<boolean> => {
+   const validateAndAddAsset = (url: string, type: 'icon' | 'wallpaper'): Promise<string | null> => {
       return new Promise(async (resolve) => {
          const tryAdd = async (targetUrl: string) => {
             const img = new Image();
             img.onload = async () => {
-               await addAsset(targetUrl, type);
-               resolve(true);
+               const newUrl = await addAsset(targetUrl, type);
+               resolve(newUrl);
             };
             img.onerror = async () => {
                // If direct load fails, try proxy
@@ -364,17 +364,17 @@ function App() {
                   // Try proxy
                   const imgProxy = new Image();
                   imgProxy.onload = async () => {
-                     await addAsset(proxyUrl, type);
-                     resolve(true);
+                     const newUrl = await addAsset(proxyUrl, type);
+                     resolve(newUrl);
                   };
                   imgProxy.onerror = () => {
                      console.warn(`Failed to load ${type} (even with proxy):`, targetUrl);
-                     resolve(false);
+                     resolve(null);
                   };
                   imgProxy.src = proxyUrl;
                } else {
                   console.warn(`Failed to load ${type}:`, targetUrl);
-                  resolve(false);
+                  resolve(null);
                }
             };
             img.src = targetUrl;
@@ -613,17 +613,23 @@ function App() {
       const val = e.target.value;
 
       // 只有当值改变时才处理
-      if (!val || val === config.backgroundImageUrl) {
+      if (!val) {
          return; // 没有改变，不需要保存
       }
 
       if (val.startsWith('http')) {
          saveConfig({ ...config, backgroundImageUrl: val });
-         await validateAndAddAsset(val, 'wallpaper');
+         const localUrl = await validateAndAddAsset(val, 'wallpaper');
+         if (localUrl) {
+            saveConfig({ ...config, backgroundImageUrl: localUrl });
+         }
       } else if (val.startsWith('data:')) {
          // data URLs are already validated (from local upload)
          saveConfig({ ...config, backgroundImageUrl: val });
-         await addAsset(val, 'wallpaper');
+         const localUrl = await addAsset(val, 'wallpaper');
+         if (localUrl) {
+            saveConfig({ ...config, backgroundImageUrl: localUrl });
+         }
       }
    };
 
