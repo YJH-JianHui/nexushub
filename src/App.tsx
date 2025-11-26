@@ -1311,32 +1311,74 @@ function App() {
                                  <p className="text-[12px] text-gray-400 italic">暂无分类,添加服务时会自动创建分类。</p>
                               ) : (
                                  <div className="space-y-2">
-                                    {categories.map((category, index) => (
-                                       <div
-                                          key={category}
-                                          draggable
-                                          onDragStart={() => setDraggedCategoryIndex(index)}
-                                          onDragOver={(e) => e.preventDefault()}
-                                          onDrop={() => {
-                                             if (draggedCategoryIndex !== null && draggedCategoryIndex !== index) {
+                                    {categories.map((category, index) => {
+                                       const handleDragStart = (e: React.DragEvent) => {
+                                          setDraggedCategoryIndex(index);
+                                          e.dataTransfer.effectAllowed = 'move';
+                                       };
+
+                                       const handleTouchStart = (e: React.TouchEvent) => {
+                                          setDraggedCategoryIndex(index);
+                                          const target = e.currentTarget as HTMLElement;
+                                          target.style.opacity = '0.5';
+                                       };
+
+                                       const handleTouchMove = (e: React.TouchEvent) => {
+                                          e.preventDefault();
+                                          const touch = e.touches[0];
+                                          const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
+                                          const categoryElement = elementAtPoint?.closest('[data-category-index]');
+                                          if (categoryElement) {
+                                             const targetIndex = parseInt(categoryElement.getAttribute('data-category-index') || '0');
+                                             if (draggedCategoryIndex !== null && draggedCategoryIndex !== targetIndex) {
                                                 const newOrder = [...categories];
                                                 const [removed] = newOrder.splice(draggedCategoryIndex, 1);
-                                                newOrder.splice(index, 0, removed);
+                                                newOrder.splice(targetIndex, 0, removed);
                                                 saveConfig({ ...config, categoryOrder: newOrder });
-                                                setDraggedCategoryIndex(null);
+                                                setDraggedCategoryIndex(targetIndex);
                                              }
-                                          }}
-                                          onDragEnd={() => setDraggedCategoryIndex(null)}
-                                          className={`flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-[8px] cursor-move hover:border-blue-300 hover:shadow-sm transition-all ${draggedCategoryIndex === index ? 'opacity-50' : ''
-                                             }`}
-                                       >
-                                          <LayoutGrid size={18} className="text-gray-400" />
-                                          <span className="flex-1 text-[14px] font-medium text-gray-900">{category}</span>
-                                          <span className="text-[12px] text-gray-500">
-                                             {servicesByCategory[category]?.length || 0} 个服务
-                                          </span>
-                                       </div>
-                                    ))}
+                                          }
+                                       };
+
+                                       const handleTouchEnd = (e: React.TouchEvent) => {
+                                          const target = e.currentTarget as HTMLElement;
+                                          target.style.opacity = '1';
+                                          setDraggedCategoryIndex(null);
+                                       };
+
+                                       const handleDrop = () => {
+                                          if (draggedCategoryIndex !== null && draggedCategoryIndex !== index) {
+                                             const newOrder = [...categories];
+                                             const [removed] = newOrder.splice(draggedCategoryIndex, 1);
+                                             newOrder.splice(index, 0, removed);
+                                             saveConfig({ ...config, categoryOrder: newOrder });
+                                             setDraggedCategoryIndex(null);
+                                          }
+                                       };
+
+                                       return (
+                                          <div
+                                             key={category}
+                                             data-category-index={index}
+                                             draggable
+                                             onDragStart={handleDragStart}
+                                             onDragOver={(e) => e.preventDefault()}
+                                             onDrop={handleDrop}
+                                             onDragEnd={() => setDraggedCategoryIndex(null)}
+                                             onTouchStart={handleTouchStart}
+                                             onTouchMove={handleTouchMove}
+                                             onTouchEnd={handleTouchEnd}
+                                             className={`flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-[8px] cursor-move hover:border-blue-300 hover:shadow-sm transition-all touch-none ${draggedCategoryIndex === index ? 'opacity-50' : ''
+                                                }`}
+                                          >
+                                             <LayoutGrid size={18} className="text-gray-400" />
+                                             <span className="flex-1 text-[14px] font-medium text-gray-900">{category}</span>
+                                             <span className="text-[12px] text-gray-500">
+                                                {servicesByCategory[category]?.length || 0} 个服务
+                                             </span>
+                                          </div>
+                                       );
+                                    })}
                                  </div>
                               )}
                            </div>

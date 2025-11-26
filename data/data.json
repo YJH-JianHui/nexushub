@@ -10,18 +10,18 @@
     "backgroundImageUrl": "/default-wallpaper.jpg",
     "backgroundBlur": 16,
     "cardMinWidth": 180,
-    "categoryColor": "#ffffff",
-    "cardTitleColor": "#1d1d1f",
-    "cardDescColor": "#4b5563",
-    "clockColor": "#ffffff",
-    "headerTitleColor": "#1f2937",
-    "headerGreetingColor": "#1f2937",
     "categoryOrder": [
       "基础设施",
       "娱乐生活",
       "影音自动化",
       "下载中心"
-    ]
+    ],
+    "categoryColor": "#ffffff",
+    "cardTitleColor": "#1d1d1f",
+    "cardDescColor": "#4b5563",
+    "clockColor": "#ffffff",
+    "headerTitleColor": "#1f2937",
+    "headerGreetingColor": "#1f2937"
   },
   "services": [
     {
