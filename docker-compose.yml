@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  nexushub:
+    image: nexushub:latest
+    container_name: nexushub
+    restart: unless-stopped
+    ports:
+      - "3001:3001"  # 应用端口(前端+API)
+    volumes:
+      # 持久化数据
+      - ./data:/app/data
+      # 持久化上传的文件
+      - ./public/uploads:/app/public/uploads
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Shanghai
+    networks:
+      - nexushub-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/data', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+networks:
+  nexushub-network:
+    driver: bridge

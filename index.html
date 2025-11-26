@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NexusHub - System Settings</title>
   <link rel="icon" type="image/png" href="/favicon.ico" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="/vendor/tailwindcss.js"></script>
+  <link href="/vendor/fonts.css" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
@@ -92,10 +92,13 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+    "react": "/vendor/react.js",
+    "react/": "/vendor/react.js",
+    "react-dom": "/vendor/react-dom.js",
+    "react-dom/": "/vendor/react-dom.js",
+    "lucide-react": "/vendor/lucide-react.js",
+    "/react@19.2.0/es2022/react.mjs": "/vendor/react.js",
+    "/react-dom@19.2.0/es2022/react-dom.mjs": "/vendor/react-dom.js"
   }
 }
 </script>
@@ -104,7 +107,7 @@
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>

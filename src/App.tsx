@@ -258,7 +258,24 @@ function App() {
    //  上传素材到服务器
    const addAsset = async (data: string, type: 'icon' | 'wallpaper'): Promise<string | null> => {
       try {
-         // 将base64或URL转换为Blob
+         // Check if it's a remote URL that needs to be downloaded by server
+         if (data.startsWith('http') && !data.includes(API_BASE)) {
+            const response = await fetch(`${API_BASE}/assets/upload-from-url`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ url: data, type })
+            });
+
+            if (response.ok) {
+               const asset = await response.json();
+               await loadAssetsFromServer();
+               return asset.url;
+            }
+            // Fallback to client-side upload if server download fails (e.g. local network issue)
+            // But usually server is better at this.
+         }
+
+         // Client-side upload (for local files or base64)
          let blob: Blob;
 
          if (data.startsWith('data:')) {
@@ -303,16 +320,35 @@ function App() {
    // Validate image can load before adding as asset
    const validateAndAddAsset = (url: string, type: 'icon' | 'wallpaper'): Promise<boolean> => {
       return new Promise(async (resolve) => {
-         const img = new Image();
-         img.onload = async () => {
-            await addAsset(url, type);
-            resolve(true);
+         const tryAdd = async (targetUrl: string) => {
+            const img = new Image();
+            img.onload = async () => {
+               await addAsset(targetUrl, type);
+               resolve(true);
+            };
+            img.onerror = async () => {
+               // If direct load fails, try proxy
+               if (!targetUrl.includes('/api/proxy-image')) {
+                  const proxyUrl = `${API_BASE}/proxy-image?url=${encodeURIComponent(targetUrl)}`;
+                  // Try proxy
+                  const imgProxy = new Image();
+                  imgProxy.onload = async () => {
+                     await addAsset(proxyUrl, type);
+                     resolve(true);
+                  };
+                  imgProxy.onerror = () => {
+                     console.warn(`Failed to load ${type} (even with proxy):`, targetUrl);
+                     resolve(false);
+                  };
+                  imgProxy.src = proxyUrl;
+               } else {
+                  console.warn(`Failed to load ${type}:`, targetUrl);
+                  resolve(false);
+               }
+            };
+            img.src = targetUrl;
          };
-         img.onerror = () => {
-            console.warn(`Failed to load ${type}:`, url);
-            resolve(false);
-         };
-         img.src = url;
+         tryAdd(url);
       });
    };
    const deleteAsset = async (id: string) => {
@@ -561,35 +597,20 @@ function App() {
       if (!urlInput) return;
       setIsFetchingIcons(true);
       setFetchedIcons([]);
-      let targetUrl = urlInput;
-      if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'http://' + targetUrl;
-      const iconsFound = new Set<string>();
-      try {
-         const urlObj = new URL(targetUrl);
-         const domain = urlObj.hostname; // 只获取域名，不包含端口号
-         // Google Favicon API - 只需要域名
-         iconsFound.add(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
 
-         // 尝试获取根URL+端口的favicon.ico
-         const baseUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? ':' + urlObj.port : ''}`;
-         iconsFound.add(`${baseUrl}/favicon.ico`);
-      } catch (e) { }
       try {
-         const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-         const response = await fetch(proxyUrl);
-         const data = await response.json();
-         if (data.contents) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data.contents, 'text/html');
-            const links = doc.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"]');
-            const metas = doc.querySelectorAll('meta[property="og:image"]');
-            const resolveUrl = (relUrl: string) => { try { return new URL(relUrl, targetUrl).href; } catch { return relUrl; } };
-            links.forEach((link: any) => { if (link.href) iconsFound.add(resolveUrl(link.href)); });
-            metas.forEach((meta: any) => { if (meta.content) iconsFound.add(resolveUrl(meta.content)); });
+         const response = await fetch(`${API_BASE}/fetch-icon-candidates?url=${encodeURIComponent(urlInput)}`);
+         if (response.ok) {
+            const data = await response.json();
+            if (data.icons && Array.isArray(data.icons)) {
+               setFetchedIcons(data.icons);
+            }
          }
-      } catch (error) { console.warn("Failed fetch", error); }
-      setFetchedIcons(Array.from(iconsFound));
-      setIsFetchingIcons(false);
+      } catch (error) {
+         console.warn("Failed fetch icons", error);
+      } finally {
+         setIsFetchingIcons(false);
+      }
    };
 
    // --- CRUD ---
@@ -926,7 +947,25 @@ function App() {
                                  {fetchedIcons.length > 0 && (
                                     <div className="mt-3 grid grid-cols-6 gap-2">
                                        {fetchedIcons.map((url, idx) => (
-                                          <button key={idx} type="button" onClick={async () => { setIconPreview(url); await validateAndAddAsset(url, 'icon'); }} className={`aspect-square rounded-md border p-1 bg-white hover:border-blue-500 transition-all flex items-center justify-center overflow-hidden ${iconPreview === url ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'}`}><img src={url} alt="" className="w-full h-full object-contain" /></button>
+                                          <button key={idx} type="button" onClick={async () => {
+                                             // Download and save the icon to local server
+                                             const localUrl = await addAsset(url, 'icon');
+                                             if (localUrl) {
+                                                setIconPreview(localUrl);
+                                             }
+                                          }} className={`aspect-square rounded-md border p-1 bg-white hover:border-blue-500 transition-all flex items-center justify-center overflow-hidden ${iconPreview === url ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'}`}>
+                                             <img
+                                                src={url}
+                                                alt=""
+                                                className="w-full h-full object-contain"
+                                                onError={(e) => {
+                                                   const target = e.currentTarget;
+                                                   if (!target.src.includes('/api/proxy-image')) {
+                                                      target.src = `${API_BASE}/proxy-image?url=${encodeURIComponent(url)}`;
+                                                   }
+                                                }}
+                                             />
+                                          </button>
                                        ))}
                                     </div>
                                  )}

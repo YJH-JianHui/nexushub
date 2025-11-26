@@ -14,10 +14,16 @@ const PORT = 3001;
 // 中间件
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// 在生产环境下,提供静态文件服务
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../dist')));
+}
+
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // 确保 uploads 目录存在
-const uploadsDir = path.join(__dirname, 'public/uploads');
+const uploadsDir = path.join(__dirname, '../public/uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -125,8 +131,187 @@ app.delete('/api/assets/:filename', (req, res) => {
     }
 });
 
+// --- Icon Fetching & Proxy ---
+
+// Helper: Resolve relative URL
+const resolveUrl = (base, relative) => {
+    try {
+        return new URL(relative, base).href;
+    } catch (e) {
+        return relative;
+    }
+};
+
+// API: Fetch Icon Candidates
+app.get('/api/fetch-icon-candidates', async (req, res) => {
+    const { url } = req.query;
+    if (!url) {
+        return res.status(400).json({ error: 'URL is required' });
+    }
+
+    let targetUrl = url;
+    if (!/^https?:\/\//i.test(targetUrl)) {
+        targetUrl = 'http://' + targetUrl;
+    }
+
+    const icons = new Set();
+    const errors = [];
+
+    try {
+        // 1. Add default /favicon.ico
+        const urlObj = new URL(targetUrl);
+        const origin = urlObj.origin;
+        icons.add(`${origin}/favicon.ico`);
+
+        // 2. Fetch HTML and parse for <link> tags
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+        const response = await fetch(targetUrl, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        clearTimeout(timeout);
+
+        if (response.ok) {
+            const html = await response.text();
+
+            // Simple Regex to find link tags
+            // Matches <link ... rel="icon" ... href="..." ... > or <link ... href="..." ... rel="icon" ... >
+            const linkRegex = /<link[^>]+rel=["'](?:shortcut )?icon["'][^>]*>/gi;
+            const hrefRegex = /href=["']([^"']+)["']/i;
+
+            const matches = html.match(linkRegex) || [];
+
+            for (const tag of matches) {
+                const hrefMatch = tag.match(hrefRegex);
+                if (hrefMatch && hrefMatch[1]) {
+                    icons.add(resolveUrl(targetUrl, hrefMatch[1]));
+                }
+            }
+
+            // Also check for apple-touch-icon
+            const appleRegex = /<link[^>]+rel=["']apple-touch-icon["'][^>]*>/gi;
+            const appleMatches = html.match(appleRegex) || [];
+            for (const tag of appleMatches) {
+                const hrefMatch = tag.match(hrefRegex);
+                if (hrefMatch && hrefMatch[1]) {
+                    icons.add(resolveUrl(targetUrl, hrefMatch[1]));
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Error fetching page for icons:', error.message);
+        errors.push(error.message);
+    }
+
+    res.json({
+        icons: Array.from(icons),
+        errors
+    });
+});
+
+// API: Proxy Image (to bypass CORS)
+app.get('/api/proxy-image', async (req, res) => {
+    const { url } = req.query;
+    if (!url) {
+        return res.status(400).send('URL is required');
+    }
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            return res.status(response.status).send('Failed to fetch image');
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+            res.setHeader('Content-Type', contentType);
+        }
+
+        // Use arrayBuffer directly
+        const arrayBuffer = await response.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
+
+    } catch (error) {
+        console.error('Proxy error:', error);
+        res.status(500).send('Proxy failed');
+    }
+});
+
+// API: Upload from URL
+app.post('/api/assets/upload-from-url', async (req, res) => {
+    try {
+        const { url, type } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            return res.status(400).json({ error: 'Failed to fetch image from URL' });
+        }
+
+        const buffer = await response.arrayBuffer();
+        const bufferData = Buffer.from(buffer);
+
+        // Determine extension
+        let ext = '.png'; // Default
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+            if (contentType.includes('jpeg') || contentType.includes('jpg')) ext = '.jpg';
+            else if (contentType.includes('gif')) ext = '.gif';
+            else if (contentType.includes('svg')) ext = '.svg';
+            else if (contentType.includes('webp')) ext = '.webp';
+            else if (contentType.includes('x-icon') || contentType.includes('vnd.microsoft.icon')) ext = '.ico';
+        }
+
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = `asset-${type || 'icon'}-${uniqueSuffix}${ext}`;
+        const filePath = path.join(uploadsDir, filename);
+
+        fs.writeFileSync(filePath, bufferData);
+
+        const asset = {
+            id: filename.replace(ext, ''),
+            type: type || 'icon',
+            url: `/uploads/${filename}`,
+            filename: filename,
+            createdAt: Date.now()
+        };
+
+        res.json(asset);
+
+    } catch (error) {
+        console.error('Upload from URL error:', error);
+        res.status(500).json({ error: 'Upload failed' });
+    }
+});
+
 // --- Data Persistence (Config & Services) ---
-const DATA_FILE = path.join(__dirname, 'data/data.json');
+const DATA_FILE = path.join(__dirname, '../data/data.json');
 const DATA_DIR = path.dirname(DATA_FILE);
 
 // Ensure data directory exists
