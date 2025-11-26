@@ -15,6 +15,25 @@ const PORT = 3001;
 app.use(cors());
 app.use(express.json());
 
+// 添加MIME类型中间件，确保图片格式正确返回
+app.use('/uploads', (req, res, next) => {
+    const ext = path.extname(req.path).toLowerCase();
+    const mimeTypes = {
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.ico': 'image/x-icon'
+    };
+
+    if (mimeTypes[ext]) {
+        res.setHeader('Content-Type', mimeTypes[ext]);
+    }
+    next();
+});
+
 // 提供静态文件服务
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 app.use('/vendor', express.static(path.join(__dirname, '../public/vendor')));

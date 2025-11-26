@@ -313,7 +313,18 @@ function App() {
 
          // 创建FormData
          const formData = new FormData();
-         const extension = blob.type.split('/')[1] || 'png';
+         // 正确处理MIME类型到扩展名的映射
+         const mimeToExt: Record<string, string> = {
+            'image/svg+xml': 'svg',
+            'image/png': 'png',
+            'image/jpeg': 'jpg',
+            'image/jpg': 'jpg',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+            'image/x-icon': 'ico',
+            'image/vnd.microsoft.icon': 'ico'
+         };
+         const extension = mimeToExt[blob.type] || blob.type.split('/')[1] || 'png';
          formData.append('file', blob, `${type}.${extension}`);
          formData.append('type', type);
 
@@ -1005,7 +1016,7 @@ function App() {
 
                               <div className="grid grid-cols-2 gap-3">
                                  <div><label className="block text-[12px] text-gray-500 mb-1">图片链接</label><input name="iconUrl" placeholder="https://..." value={iconPreview.startsWith('data:') ? '' : iconPreview} onChange={(e) => setIconPreview(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-[8px] px-2 py-1.5 text-[13px] focus:outline-none focus:border-blue-500" /></div>
-                                 <div><label className="block text-[12px] text-gray-500 mb-1">本地上传</label><label className="flex items-center justify-center gap-2 w-full bg-white border border-dashed border-gray-300 rounded-[8px] px-2 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors"><Upload size={14} className="text-gray-400" /><span className="text-[13px] text-gray-600">选择图片</span><input type="file" accept="image/*" onChange={handleIconUpload} className="hidden" /></label></div>
+                                 <div><label className="block text-[12px] text-gray-500 mb-1">本地上传</label><label className="flex items-center justify-center gap-2 w-full bg-white border border-dashed border-gray-300 rounded-[8px] px-2 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors"><Upload size={14} className="text-gray-400" /><span className="text-[13px] text-gray-600">选择图片</span><input type="file" accept="image/svg+xml,image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-icon" onChange={handleIconUpload} className="hidden" /></label></div>
                               </div>
 
                               {/* Asset Library for Icons */}
@@ -1278,7 +1289,7 @@ function App() {
                                     <label className="flex flex-col items-center justify-center gap-2 w-full h-32 bg-gray-50 border-2 border-dashed border-gray-300 rounded-[12px] cursor-pointer hover:bg-gray-100 transition-colors">
                                        <Upload size={24} className="text-gray-400" />
                                        <span className="text-[13px] text-gray-600">点击选择图片</span>
-                                       <input type="file" accept="image/*" onChange={handleWallpaperUpload} className="hidden" />
+                                       <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/jpg,image/gif,image/webp,image/x-icon" onChange={handleWallpaperUpload} className="hidden" />
                                     </label>
                                  </div>
                                  {wallpaperAssets.length > 0 && (

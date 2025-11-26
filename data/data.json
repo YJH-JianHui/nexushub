@@ -1,127 +1,14 @@
 {
   "config": {
-    "users": [
-      {
-        "username": "root",
-        "passwordHash": "56760663"
-      }
-    ],
     "enableGuestAccess": false,
     "backgroundImageUrl": "/default-wallpaper.jpg",
     "backgroundBlur": 16,
     "cardMinWidth": 180,
-    "categoryOrder": [
-      "基础设施",
-      "娱乐生活",
-      "影音自动化",
-      "下载中心"
-    ],
     "categoryColor": "#ffffff",
     "cardTitleColor": "#1d1d1f",
     "cardDescColor": "#4b5563",
     "clockColor": "#ffffff",
     "headerTitleColor": "#1f2937",
     "headerGreetingColor": "#1f2937"
-  },
-  "services": [
-    {
-      "id": "1764123964358",
-      "name": "ESXi",
-      "description": "底层虚拟化平台",
-      "urlInternal": "https://10.0.0.254",
-      "urlExternal": "https://esxi.yjhroot.top:8443",
-      "category": "基础设施",
-      "iconUrl": "/uploads/asset-icon-1764123959159-879832350.png"
-    },
-    {
-      "id": "1764124333419",
-      "name": "OpenWRT",
-      "description": "主路由系统",
-      "urlInternal": "http://10.0.0.1",
-      "urlExternal": "https://openwrt.yjhroot.top:8443",
-      "category": "基础设施",
-      "iconUrl": ""
-    },
-    {
-      "id": "1764124373436",
-      "name": "AdguardHome",
-      "description": "全网广告拦截与DNS",
-      "urlInternal": "http://10.0.0.10:3000",
-      "urlExternal": "https://adguard.yjhroot.top:8443",
-      "category": "基础设施",
-      "iconUrl": "/uploads/asset-icon-1764124368214-637670170.png"
-    },
-    {
-      "id": "1764124414228",
-      "name": "Immich",
-      "description": "AI 智能相册备份",
-      "urlInternal": "http://10.0.0.10:2283",
-      "urlExternal": "https://immich.yjhroot.top:8443",
-      "category": "娱乐生活",
-      "iconUrl": "/uploads/asset-icon-1764124408142-420860072.png"
-    },
-    {
-      "id": "1764124451996",
-      "name": "Jellyfin",
-      "description": "家庭影院媒体中心",
-      "urlInternal": "http://10.0.0.10:8096",
-      "urlExternal": "https://jellyfin.yjhroot.top:8443",
-      "category": "娱乐生活",
-      "iconUrl": ""
-    },
-    {
-      "id": "1764124493172",
-      "name": "OpenList",
-      "description": "轻量级目录索引",
-      "urlInternal": "http://10.0.0.10:5244",
-      "urlExternal": "https://openlist.yjhroot.top:8443/",
-      "category": "娱乐生活",
-      "iconUrl": "/uploads/asset-icon-1764124516324-151178918.svg"
-    },
-    {
-      "id": "1764124558588",
-      "name": "Radarr",
-      "description": "电影订阅与管理",
-      "urlInternal": "http://10.0.0.10:7878",
-      "urlExternal": "https://radarr.yjhroot.top:8443/",
-      "category": "影音自动化",
-      "iconUrl": "/uploads/asset-icon-1764124552855-96558658.png"
-    },
-    {
-      "id": "1764124594268",
-      "name": "Sonarr",
-      "description": "剧集订阅与管理",
-      "urlInternal": "http://10.0.0.10:8989",
-      "urlExternal": "https://sonarr.yjhroot.top:8443",
-      "category": "影音自动化",
-      "iconUrl": "/uploads/asset-icon-1764124589385-366066979.png"
-    },
-    {
-      "id": "1764124730187",
-      "name": "Prowlarr",
-      "description": "索引器统一管理",
-      "urlInternal": "http://10.0.0.10:9696",
-      "urlExternal": "https://prowlarr.yjhroot.top:8443",
-      "category": "影音自动化",
-      "iconUrl": "/uploads/asset-icon-1764124724782-647249803.png"
-    },
-    {
-      "id": "1764124767755",
-      "name": "迅雷",
-      "description": "磁力与常规文件下载",
-      "urlInternal": "http://10.0.0.10:2345",
-      "urlExternal": "https://xunlei.yjhroot.top:8443",
-      "category": "下载中心",
-      "iconUrl": ""
-    },
-    {
-      "id": "1764124824587",
-      "name": "qBittorrent",
-      "description": "BT/PT 资源挂机下载",
-      "urlInternal": "http://10.0.0.10:8080",
-      "urlExternal": "https://qbit.yjhroot.top:8443",
-      "category": "下载中心",
-      "iconUrl": "/uploads/asset-icon-1764124816127-831691167.svg"
-    }
-  ]
+  }
 }
