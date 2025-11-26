@@ -31,11 +31,14 @@ export interface AppConfig {
   // New multi-user support
   users: User[];
   enableGuestAccess?: boolean; // New field
-  
+
   backgroundImageUrl: string;
   backgroundBlur: number; // px value
   cardMinWidth: number; // px value
-  
+
+  // Category order
+  categoryOrder?: string[]; // Custom category display order
+
   // Colors
   categoryColor: string;
   cardTitleColor: string;

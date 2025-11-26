@@ -38,7 +38,7 @@ function App() {
    const [serviceToDelete, setServiceToDelete] = useState<string | null>(null); // New state for deletion confirmation
    const [assetToDelete, setAssetToDelete] = useState<string | null>(null); // State for asset deletion confirmation
    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-   const [settingsTab, setSettingsTab] = useState<'appearance' | 'wallpaper' | 'users' | 'data' | 'assets'>('appearance');
+   const [settingsTab, setSettingsTab] = useState<'appearance' | 'wallpaper' | 'users' | 'data' | 'assets' | 'categories'>('appearance');
    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
    // Password Change State
@@ -59,6 +59,7 @@ function App() {
 
    // Drag and Drop State
    const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+   const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
 
    // Clock & Scroll State
    const [currentTime, setCurrentTime] = useState(new Date());
@@ -707,8 +708,20 @@ function App() {
    const categories = useMemo(() => {
       const cats = new Set<string>();
       services.forEach(s => cats.add(s.category));
-      return Array.from(cats).sort();
-   }, [services]);
+      const allCategories = Array.from(cats);
+
+      // Use custom order if available
+      if (config.categoryOrder && config.categoryOrder.length > 0) {
+         // Filter out categories that no longer exist
+         const orderedExisting = config.categoryOrder.filter(cat => allCategories.includes(cat));
+         // Add new categories that aren't in the order yet
+         const newCategories = allCategories.filter(cat => !config.categoryOrder!.includes(cat));
+         return [...orderedExisting, ...newCategories];
+      }
+
+      // Default: alphabetical sort
+      return allCategories.sort();
+   }, [services, config.categoryOrder]);
 
    const servicesByCategory = useMemo(() => {
       const grouped: Record<string, ServiceItem[]> = {};
@@ -1144,6 +1157,7 @@ function App() {
                                  {[
                                     { id: 'appearance', label: '界面外观', icon: Palette },
                                     { id: 'wallpaper', label: '壁纸设置', icon: ImageIcon },
+                                    { id: 'categories', label: '分类管理', icon: LayoutGrid },
                                     { id: 'assets', label: '素材管理', icon: FolderOpen },
                                     ...(isAdmin ? [{ id: 'users', label: '用户管理', icon: Users }] : []),
                                     { id: 'data', label: '数据管理', icon: Database }
@@ -1267,6 +1281,47 @@ function App() {
                                     </div>
                                  )}
                               </div>
+                           </div>
+                        )}
+
+                        {/* TAB: CATEGORIES */}
+                        {settingsTab === 'categories' && (
+                           <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+                              <h3 className="text-[16px] font-bold text-gray-900 mb-4">分类管理</h3>
+                              <p className="text-[13px] text-gray-600 mb-4">拖拽分类以调整显示顺序</p>
+
+                              {categories.length === 0 ? (
+                                 <p className="text-[12px] text-gray-400 italic">暂无分类,添加服务时会自动创建分类。</p>
+                              ) : (
+                                 <div className="space-y-2">
+                                    {categories.map((category, index) => (
+                                       <div
+                                          key={category}
+                                          draggable
+                                          onDragStart={() => setDraggedCategoryIndex(index)}
+                                          onDragOver={(e) => e.preventDefault()}
+                                          onDrop={() => {
+                                             if (draggedCategoryIndex !== null && draggedCategoryIndex !== index) {
+                                                const newOrder = [...categories];
+                                                const [removed] = newOrder.splice(draggedCategoryIndex, 1);
+                                                newOrder.splice(index, 0, removed);
+                                                saveConfig({ ...config, categoryOrder: newOrder });
+                                                setDraggedCategoryIndex(null);
+                                             }
+                                          }}
+                                          onDragEnd={() => setDraggedCategoryIndex(null)}
+                                          className={`flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-[8px] cursor-move hover:border-blue-300 hover:shadow-sm transition-all ${draggedCategoryIndex === index ? 'opacity-50' : ''
+                                             }`}
+                                       >
+                                          <LayoutGrid size={18} className="text-gray-400" />
+                                          <span className="flex-1 text-[14px] font-medium text-gray-900">{category}</span>
+                                          <span className="text-[12px] text-gray-500">
+                                             {servicesByCategory[category]?.length || 0} 个服务
+                                          </span>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
                            </div>
                         )}
 

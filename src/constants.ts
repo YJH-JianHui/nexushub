@@ -11,6 +11,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   backgroundBlur: 16, // default 16px
   cardMinWidth: 180,
 
+  // Category order (empty means auto-sort alphabetically)
+  categoryOrder: [],
+
   // Colors
   categoryColor: '#ffffff',
   cardTitleColor: '#1d1d1f',
