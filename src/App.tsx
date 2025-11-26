@@ -74,6 +74,23 @@ function App() {
    const [failedWallpaperUrl, setFailedWallpaperUrl] = useState<string>(''); // 记住失败的URL
 
    // --- Initialization ---
+   // Mobile viewport height fix
+   useEffect(() => {
+      const setVH = () => {
+         const vh = window.innerHeight * 0.01;
+         document.documentElement.style.setProperty('--vh', `${vh}px`);
+      };
+
+      setVH();
+      window.addEventListener('resize', setVH);
+      window.addEventListener('orientationchange', setVH);
+
+      return () => {
+         window.removeEventListener('resize', setVH);
+         window.removeEventListener('orientationchange', setVH);
+      };
+   }, []);
+
    // --- Initialization ---
    useEffect(() => {
       const initData = async () => {
@@ -771,14 +788,14 @@ function App() {
 
    if (isLoading || !authInitialized) {
       return (
-         <div className="flex h-screen w-full items-center justify-center bg-gray-900">
+         <div className="flex h-screen-mobile w-full items-center justify-center bg-gray-900">
             <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
          </div>
       );
    }
 
    return (
-      <div className="relative h-screen w-full overflow-hidden font-sans text-[#1d1d1f] selection:bg-blue-500/30">
+      <div className="relative h-screen-mobile w-full overflow-hidden font-sans text-[#1d1d1f] selection:bg-blue-500/30">
          <div
             className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700"
             style={{ backgroundImage: `url(${wallpaperUrl})` }}
@@ -880,7 +897,7 @@ function App() {
                   </div>
                </header>
 
-               <main className="pt-20 pb-20 px-4 md:px-12 w-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <main className="pt-8 pb-20 px-4 md:px-12 w-full mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="flex flex-col items-center justify-center py-12 md:py-16 select-none">
                      <h1 className="text-4xl md:text-5xl font-bold drop-shadow-lg tracking-tight mb-2" style={{ color: config.clockColor || '#ffffff' }}>{formatTime(currentTime)}</h1>
                      <p className="text-lg md:text-xl font-medium drop-shadow-md tracking-wide opacity-90" style={{ color: config.clockColor || '#ffffff' }}>{formatDate(currentTime)}</p>

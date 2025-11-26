@@ -40,6 +40,35 @@
       /* App handles scrolling inside the window */
     }
 
+    /* Mobile viewport height fix */
+    :root {
+      --vh: 1vh;
+    }
+
+    .h-screen-mobile {
+      height: 100vh;
+      /* Fallback */
+      height: calc(var(--vh, 1vh) * 100);
+    }
+
+    /* Custom scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
     /* macOS Native Scrollbar */
     ::-webkit-scrollbar {
       width: 10px;
