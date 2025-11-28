@@ -1,8 +1,7 @@
 {
   "config": {
     "enableGuestAccess": false,
-    "backgroundImageUrl": "/default-wallpaper.jpg",
-    "backgroundBlur": 16,
+    "backgroundBlur": 10,
     "cardMinWidth": 180,
     "categoryOrder": [],
     "categoryColor": "#ffffff",

@@ -31,6 +31,7 @@ export interface AppConfig {
   // New multi-user support
   users: User[];
   enableGuestAccess?: boolean; // New field
+  hasUsers?: boolean; // Server flag indicating if users exist (even if filtered)
 
   backgroundImageUrl: string;
   backgroundBlur: number; // px value

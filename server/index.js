@@ -4,16 +4,47 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'nexushub-secret-key-change-this-in-prod';
+
+// Auth Middleware
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) {
+        req.user = null; // Mark as unauthenticated
+        return next();
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            req.user = null; // Invalid token
+        } else {
+            req.user = user;
+        }
+        next();
+    });
+};
+
+// Require Auth Middleware (for write operations)
+const requireAuth = (req, res, next) => {
+    if (!req.user) {
+        return res.sendStatus(401);
+    }
+    next();
+};
 
 // 中间件
 app.use(cors());
 app.use(express.json());
+app.use(authenticateToken); // Apply auth check to all routes (populates req.user)
 
 // 添加MIME类型中间件，确保图片格式正确返回
 app.use('/uploads', (req, res, next) => {
@@ -68,8 +99,8 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB 限制
 });
 
-// API: 上传素材
-app.post('/api/assets/upload', upload.single('file'), (req, res) => {
+// API: 上传素材 (Protected)
+app.post('/api/assets/upload', requireAuth, upload.single('file'), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -135,8 +166,8 @@ app.get('/api/assets', (req, res) => {
     }
 });
 
-// API: 删除素材
-app.delete('/api/assets/:filename', (req, res) => {
+// API: 删除素材 (Protected)
+app.delete('/api/assets/:filename', requireAuth, (req, res) => {
     try {
         const { filename } = req.params;
         const filePath = path.join(uploadsDir, filename);
@@ -273,8 +304,8 @@ app.get('/api/proxy-image', async (req, res) => {
     }
 });
 
-// API: Upload from URL
-app.post('/api/assets/upload-from-url', async (req, res) => {
+// API: Upload from URL (Protected)
+app.post('/api/assets/upload-from-url', requireAuth, async (req, res) => {
     try {
         const { url, type } = req.body;
         if (!url) {
@@ -389,29 +420,113 @@ const writeData = (data) => {
     }
 };
 
-// API: Get Data (Config & Services)
-app.get('/api/data', (req, res) => {
+// API: Login
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
     const data = readData();
-    res.json(data);
+    const user = data.config.users.find(u => u.username === username);
+
+    if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Verify password
+    const crypto = await import('crypto');
+
+    // Helper: Simple Hash (Fallback)
+    const simpleHash = (str) => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash).toString(16).padStart(8, '0');
+    };
+
+    const hashPassword = (pwd) => {
+        return crypto.createHash('sha256').update(pwd).digest('hex');
+    };
+
+    // Check if password matches
+    let isValid = false;
+
+    if (user.passwordHash && user.passwordHash.length === 64) {
+        // SHA-256
+        isValid = user.passwordHash === hashPassword(password);
+    } else if (user.passwordHash && user.passwordHash.length === 8) {
+        // Simple Hash
+        isValid = user.passwordHash === simpleHash(password);
+    } else {
+        // Unknown hash type or no hash
+        isValid = false;
+    }
+
+    if (isValid) {
+        const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, username: user.username });
+    } else {
+        res.status(401).json({ error: 'Invalid credentials' });
+    }
 });
 
-// API: Update Data
+// API: Get Data (Config & Services) - Protected/Filtered
+app.get('/api/data', (req, res) => {
+    const data = readData();
+
+    if (req.user) {
+        // Authenticated: Return full data
+        res.json(data);
+    } else {
+        // Unauthenticated: Return safe public data only
+        const safeConfig = { ...data.config };
+
+        // Remove sensitive info
+        delete safeConfig.users; // Don't expose user list/hashes
+
+        // Only return public config settings needed for login screen/background
+        const publicConfig = {
+            backgroundImageUrl: safeConfig.backgroundImageUrl,
+            backgroundBlur: safeConfig.backgroundBlur,
+            enableGuestAccess: safeConfig.enableGuestAccess,
+            // UI Colors
+            categoryColor: safeConfig.categoryColor,
+            cardTitleColor: safeConfig.cardTitleColor,
+            cardDescColor: safeConfig.cardDescColor,
+            clockColor: safeConfig.clockColor,
+            headerTitleColor: safeConfig.headerTitleColor,
+            headerGreetingColor: safeConfig.headerGreetingColor,
+            // Keep users array empty or just a flag if needed, but better to hide it.
+            // But frontend checks `config.users.length` to decide if it's first run.
+            // We should send a flag "hasUsers" instead of the array.
+            hasUsers: data.config.users && data.config.users.length > 0
+        };
+
+        res.json({
+            config: publicConfig,
+            services: [] // Hide services
+        });
+    }
+});
+
+// API: Update Data (Protected - unless first run)
 app.post('/api/data', (req, res) => {
     try {
+        const currentData = readData();
+
+        // Security Check: Require auth if users exist
+        if (currentData.config.users && currentData.config.users.length > 0) {
+            if (!req.user) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+        }
+
         const newData = req.body;
         // Basic validation could go here
         if (!newData.config && !newData.services) {
             return res.status(400).json({ error: 'Invalid data structure' });
         }
 
-        // Merge with existing data to prevent partial updates from wiping other sections if we wanted,
-        // but for this app, we usually save the whole state or specific sections.
-        // Let's assume the frontend sends the specific section to update or the whole thing.
-        // Actually, to keep it simple and robust:
-        // The frontend currently separates saveConfig and saveServices.
-        // We should support partial updates or just read-modify-write.
-
-        const currentData = readData();
         const updatedData = {
             ...currentData,
             ...newData

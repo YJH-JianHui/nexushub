@@ -96,7 +96,10 @@ function App() {
       const initData = async () => {
          try {
             // 1. Fetch Config & Services
-            const dataRes = await fetch(`${API_BASE}/data`);
+            const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+            const dataRes = await fetch(`${API_BASE}/data`, { headers });
             let currentConfig = DEFAULT_CONFIG;
 
             if (dataRes.ok) {
@@ -105,6 +108,7 @@ function App() {
                   currentConfig = { ...DEFAULT_CONFIG, ...serverData.config };
                   setConfig(currentConfig);
                }
+               // If services are returned, it means we are authenticated (or data is public, but we protected it)
                if (serverData.services) {
                   setServices(serverData.services);
                }
@@ -133,27 +137,27 @@ function App() {
             }
 
             // 4. Auth Check
+            const storedToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
             const authDataStr = localStorage.getItem(STORAGE_KEYS.AUTH_DATA);
-            if (authDataStr) {
+
+            if (storedToken && authDataStr) {
                try {
                   const authData = JSON.parse(authDataStr);
-                  const now = Date.now();
-                  const daysPassed = (now - authData.timestamp) / (1000 * 60 * 60 * 24);
+                  // We assume token is valid if it exists, server will reject if expired.
+                  // But we can check expiration locally if we want (JWT decode), but simple check is fine.
+                  // If /api/data returned services, we are good.
 
-                  if (daysPassed < AUTH_EXPIRATION_DAYS) {
-                     // Check if user exists in the FETCHED config
-                     if (currentConfig.users && currentConfig.users.some(u => u.username === authData.username)) {
-                        setIsAuthenticated(true);
-                        setCurrentUser(authData.username);
-                        setIsGuest(false);
-                     } else {
-                        localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
-                     }
-                  } else {
-                     localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
-                  }
+                  // Check if services were loaded (indicator of valid auth)
+                  // Actually, better to rely on the response from /api/data.
+                  // If /api/data returned empty services but we have a token, it might be expired.
+                  // But let's assume if we have a token, we are logged in until 401 happens.
+
+                  setIsAuthenticated(true);
+                  setCurrentUser(authData.username);
+                  setIsGuest(false);
                } catch (e) {
                   localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
+                  localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
                }
             } else {
                // Guest Access Check
@@ -226,9 +230,13 @@ function App() {
    const saveConfig = async (newConfig: AppConfig) => {
       setConfig(newConfig);
       try {
+         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
          await fetch(`${API_BASE}/data`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+               'Content-Type': 'application/json',
+               'Authorization': token ? `Bearer ${token}` : ''
+            },
             body: JSON.stringify({ config: newConfig })
          });
       } catch (e) {
@@ -239,9 +247,13 @@ function App() {
    const saveServices = async (newServices: ServiceItem[]) => {
       setServices(newServices);
       try {
+         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
          await fetch(`${API_BASE}/data`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+               'Content-Type': 'application/json',
+               'Authorization': token ? `Bearer ${token}` : ''
+            },
             body: JSON.stringify({ services: newServices })
          });
       } catch (e) {
@@ -280,9 +292,13 @@ function App() {
       try {
          // Check if it's a remote URL that needs to be downloaded by server
          if (data.startsWith('http') && !data.includes(API_BASE)) {
+            const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
             const response = await fetch(`${API_BASE}/assets/upload-from-url`, {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
+               headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : ''
+               },
                body: JSON.stringify({ url: data, type })
             });
 
@@ -329,8 +345,12 @@ function App() {
          formData.append('type', type);
 
          // 上传到服务器
+         const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
          const uploadResponse = await fetch(`${API_BASE}/assets/upload`, {
             method: 'POST',
+            headers: {
+               'Authorization': token ? `Bearer ${token}` : ''
+            },
             body: formData
          });
 
@@ -395,8 +415,12 @@ function App() {
                // 从URL中提取文件名
                const filename = asset.data.split('/').pop();
                if (filename) {
+                  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
                   const response = await fetch(`${API_BASE}/assets/${filename}`, {
-                     method: 'DELETE'
+                     method: 'DELETE',
+                     headers: {
+                        'Authorization': token ? `Bearer ${token}` : ''
+                     }
                   });
 
                   if (response.ok) {
@@ -424,7 +448,10 @@ function App() {
 
    const handleAuthenticate = async (password: string, inputUsername: string) => {
       // 0. 首次运行 / 注册
-      if (config.users.length === 0) {
+      // Only if NO users locally AND server says NO users
+      const isFirstRun = config.users.length === 0 && !config.hasUsers;
+
+      if (isFirstRun) {
          if (password.length < 4) {
             return { success: false, isNewUser: false, needsPasswordSetup: true };
          }
@@ -438,37 +465,55 @@ function App() {
 
       const userIndex = config.users.findIndex(u => u.username === inputUsername);
 
-      // 1. 用户不存在
-      if (userIndex === -1) {
-         return { success: false, isNewUser: true, needsPasswordSetup: false };
-      }
-
-      const user = config.users[userIndex];
-
-      // 2. 设置密码（如果为 null）
-      if (user.passwordHash === null) {
-         if (password.length >= 4) {
-            const hashedPassword = await hashPassword(password);
-            const updatedUsers = [...config.users];
-            updatedUsers[userIndex] = { ...user, passwordHash: hashedPassword };
-            saveConfig({ ...config, users: updatedUsers });
-            loginSuccess(inputUsername);
-            return { success: true, isNewUser: false, needsPasswordSetup: true };
-         } else {
-            return { success: false, isNewUser: false, needsPasswordSetup: true };
+      // 1. Check for Password Setup (Local only)
+      if (userIndex !== -1) {
+         const user = config.users[userIndex];
+         // 2. 设置密码（如果为 null）
+         if (user.passwordHash === null) {
+            if (password.length >= 4) {
+               const hashedPassword = await hashPassword(password);
+               const updatedUsers = [...config.users];
+               updatedUsers[userIndex] = { ...user, passwordHash: hashedPassword };
+               saveConfig({ ...config, users: updatedUsers });
+               loginSuccess(inputUsername);
+               return { success: true, isNewUser: false, needsPasswordSetup: true };
+            } else {
+               return { success: false, isNewUser: false, needsPasswordSetup: true };
+            }
          }
       }
 
-      // 3. 验证密码 - 使用新的 verifyPassword 函数（兼容双哈希）
-      const isPasswordValid = await verifyPassword(password, user.passwordHash);
+      // 3. Server-side Login (Try this for all other cases)
+      try {
+         const response = await fetch(`${API_BASE}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: inputUsername, password })
+         });
 
-      if (isPasswordValid) {
-         // 登录成功
-         loginSuccess(inputUsername);
-         return { success: true, isNewUser: false, needsPasswordSetup: false };
+         if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.token);
+            loginSuccess(inputUsername);
+
+            // Reload data to get services
+            window.location.reload();
+            return { success: true, isNewUser: false, needsPasswordSetup: false };
+         }
+      } catch (e) {
+         console.error("Login error", e);
       }
 
-      // 密码错误
+      // 密码错误 or User not found on server
+      // If we are here, server login failed.
+      // If user was not found locally either, we can say "User not found" if we want,
+      // but for security "Invalid credentials" is better.
+      // However, to match existing UI behavior:
+      if (userIndex === -1 && !config.hasUsers) {
+         // If we are in local mode and user not found
+         return { success: false, isNewUser: true, needsPasswordSetup: false };
+      }
+
       return { success: false, isNewUser: false, needsPasswordSetup: false };
    };
 
@@ -488,7 +533,9 @@ function App() {
       setCurrentUser('');
       setIsEditing(false);
       setIsSettingsModalOpen(false);
+      setIsSettingsModalOpen(false);
       localStorage.removeItem(STORAGE_KEYS.AUTH_DATA);
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
 
       // If guest access is enabled, immediately revert to guest mode
       if (config.enableGuestAccess && config.users.length > 0) {
@@ -839,6 +886,7 @@ function App() {
                onAuthenticate={handleAuthenticate}
                checkUserStatus={checkUserStatus}
                userCount={config.users?.length || 0}
+               hasUsers={config.hasUsers}
                onCancel={isAuthenticated ? () => setShowLoginModal(false) : undefined}
             />
          )}

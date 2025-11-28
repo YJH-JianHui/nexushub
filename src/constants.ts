@@ -29,6 +29,7 @@ export const STORAGE_KEYS = {
   SERVICES: 'nexus_services',
   CONFIG: 'nexus_config',
   AUTH_DATA: 'nexus_auth_data',
+  AUTH_TOKEN: 'nexus_auth_token', // JWT Token
   ASSETS: 'nexus_assets', // New key for asset library
   NETWORK_MODE: 'nexus_network_mode'
 };
